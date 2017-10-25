@@ -5,12 +5,14 @@ use Monolog\Handler\HipChatHandler;
 use Monolog\Processor\WebProcessor;
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\ErrorLogHandler;
+use Monolog\Formatter\HtmlFormatter;
 
 return [
     'fallback' => 'stream',
 
     'formatters' => [
         'line_formatter' => new LineFormatter(),
+        'html_formatter' => new HtmlFormatter(),
     ],
 
     'handlers' => [
@@ -77,6 +79,18 @@ return [
 //            'subject' => 'Laravel Log',
 //            'from' => null,
 //            'level' => Logger::DEBUG,
+//        ],
+//        'swiftmail' => [
+//            'enabled' => false,
+//            'driver' => 'swift_mailer',
+//            'to' => null,
+//            'subject' => 'Laravel Log',
+//            'from' => [
+//                'email' => null,
+//                'name' => null,
+//            ],
+//            'level' => Logger::DEBUG,
+//            'formatter' => 'html_formatter',
 //        ],
 //        'devnull' => [
 //            'enabled' => false,

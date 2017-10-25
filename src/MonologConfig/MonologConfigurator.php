@@ -2,6 +2,7 @@
 
 namespace Astrotomic\MonologConfig;
 
+use Illuminate\Mail\TransportManager;
 use Predis\Client;
 use Gelf\Publisher;
 use Monolog\Logger;
@@ -28,6 +29,7 @@ use Monolog\Handler\NativeMailerHandler;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\SlackWebhookHandler;
 use Monolog\Formatter\FormatterInterface;
+use Monolog\Handler\SwiftMailerHandler;
 
 class MonologConfigurator
 {
@@ -196,6 +198,26 @@ class MonologConfigurator
     protected function getNativeMailerHandler(array $config)
     {
         return new NativeMailerHandler($config['to'], $config['subject'], $config['from'], $config['level']);
+    }
+
+    /**
+     * @param array $config
+     * @return SwiftMailerHandler
+     * @since v1.5
+     */
+    protected function getSwiftMailerHandler(array $config)
+    {
+        $transport = new TransportManager(app());
+        $mailer = new \Swift_Mailer($transport->driver());
+
+        $swiftMessage = \Swift_Message::newInstance($config['subject'])
+            ->setFrom($config['from']['email'], $config['from']['name'])
+            ->setTo($config['to']);
+
+        return new SwiftMailerHandler($mailer,
+            $swiftMessage->setBody('', 'text/html'),
+            $config['level'],
+            true);
     }
 
     /**
