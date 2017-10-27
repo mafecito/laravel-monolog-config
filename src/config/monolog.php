@@ -79,6 +79,7 @@ return [
 //            'subject' => 'Laravel Log',
 //            'from' => null,
 //            'level' => Logger::DEBUG,
+//            'wrapper' => 'buffer'
 //        ],
 //        'swiftmail' => [
 //            'enabled' => false,

@@ -2,14 +2,9 @@
 
 namespace Astrotomic\MonologConfig;
 
-use Illuminate\Mail\TransportManager;
-use Predis\Client;
-use Gelf\Publisher;
-use Monolog\Logger;
 use Illuminate\Support\Str;
-use Gelf\Transport\TcpTransport;
-use Gelf\Transport\UdpTransport;
-use Monolog\Handler\GelfHandler;
+use Illuminate\Mail\TransportManager;
+use Monolog\Logger;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\IFTTTHandler;
 use Monolog\Handler\RedisHandler;
@@ -28,8 +23,15 @@ use Monolog\Handler\ZendMonitorHandler;
 use Monolog\Handler\NativeMailerHandler;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\SlackWebhookHandler;
-use Monolog\Formatter\FormatterInterface;
 use Monolog\Handler\SwiftMailerHandler;
+use Monolog\Handler\FingersCrossedHandler;
+use Monolog\Handler\BufferHandler;
+use Monolog\Handler\GelfHandler;
+use Predis\Client;
+use Gelf\Publisher;
+use Gelf\Transport\TcpTransport;
+use Gelf\Transport\UdpTransport;
+use Monolog\Formatter\FormatterInterface;
 
 class MonologConfigurator
 {
@@ -48,7 +50,13 @@ class MonologConfigurator
         $fallback = true;
         foreach ($this->config['handlers'] as $config) {
             if (array_get($config, 'enabled', false)) {
-                $fallback = $this->pushHandler($config['driver'], $config) ? false : $fallback;
+
+                $handler = $config['driver'];
+
+                if (array_key_exists('wrapper', $config)) {
+                    $handler = $config['wrapper'];
+                }
+                $fallback = $this->pushHandler($handler, $config) ? false : $fallback;
             }
         }
 
@@ -71,19 +79,35 @@ class MonologConfigurator
         $this->monolog->pushProcessor($processor);
     }
 
-    protected function pushHandler($handler, array $config)
+    private function getHandler($stringHandler, $config)
     {
-        $method = $method = 'get'.Str::studly($handler).'Handler';
+        return $this->$stringHandler($config);
+    }
+
+    private function getMethodString($handler)
+    {
+        return 'get' . Str::studly($handler) . 'Handler';
+    }
+
+    private function setFormatter($handler, $config){
+        if (array_key_exists('formatter', $config)) {
+            $formatter = array_get($this->config['formatters'], $config['formatter']);
+            if ($formatter instanceof FormatterInterface) {
+                $handler->setFormatter($formatter);
+            }
+        }
+    }
+
+    protected function pushHandler($stringHandler, array $config)
+    {
+        $method = $this->getMethodString($stringHandler);
         if (method_exists($this, $method)) {
             try {
-                $handler = $this->$method($config);
+                $handler = $this->getHandler($method, $config);
                 if ($handler instanceof AbstractHandler) {
                     $this->monolog->pushHandler($handler);
-                    if (array_key_exists('formatter', $config)) {
-                        $formatter = array_get($this->config['formatters'], $config['formatter']);
-                        if ($formatter instanceof FormatterInterface) {
-                            $handler->setFormatter($formatter);
-                        }
+                    if (false === array_key_exists('wrapper', $config) || $config['wrapper'] !== $stringHandler) {
+                        $this->setFormatter($handler, $config);
                     }
                 }
 
@@ -125,6 +149,20 @@ class MonologConfigurator
     protected function getStreamHandler(array $config)
     {
         return new StreamHandler($config['path'], $config['level']);
+    }
+
+    /**
+     * @param array $config
+     * @return BufferHandler
+     * @since v1.4
+     */
+    protected function getBufferHandler(array $config)
+    {
+        $method = $this->getMethodString($config['driver']);
+
+        $handler = $this->getHandler($method, $config);
+        $this->setFormatter($handler, $config);
+        return new BufferHandler($handler, 20, $config['level']);
     }
 
     /**
@@ -203,7 +241,7 @@ class MonologConfigurator
     /**
      * @param array $config
      * @return SwiftMailerHandler
-     * @since v1.5
+     * @since v1.4
      */
     protected function getSwiftMailerHandler(array $config)
     {
